@@ -229,8 +229,9 @@ class Task2Dataset(Dataset):
                 item_id = int(tkns[0])
                 feature_ids = []
                 for f in tkns[1:]:
-                    feature_ids.append(int(f))
-                    self.max_feature_id = max(self.max_feature_id, int(f))
+                    if f != 'None':
+                        feature_ids.append(int(f))
+                        self.max_feature_id = max(self.max_feature_id, int(f))
 
                 buf[item_id] = feature_ids
 
