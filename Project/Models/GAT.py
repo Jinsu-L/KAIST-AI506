@@ -75,9 +75,6 @@ class GAT(nn.Module):
     def __init__(self, g, in_dim, hidden_dim, out_dim, num_heads):
         super(GAT, self).__init__()
         self.layer1 = MultiHeadGATLayer(g, in_dim, hidden_dim, num_heads)
-        # Be aware that the input dimension is hidden_dim*num_heads since
-        # multiple head outputs are concatenated together. Also, only
-        # one attention head in the output layer.
         self.layer2 = MultiHeadGATLayer(g, hidden_dim * num_heads, hidden_dim, num_heads)
         self.layer3 = MultiHeadGATLayer(g, hidden_dim * num_heads, out_dim, 1)
 
