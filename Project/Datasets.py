@@ -10,20 +10,25 @@ from torch.utils.data import Dataset
 from torch import nn
 from collections import defaultdict
 
+
 class Task1Dataset(Dataset):
     def __init__(self, path, is_train=True):
         self.path = path
         self.is_train = is_train
 
-        train_file = path + "/user_itemset_training.csv" # 여기 있는 건 전부 True
+        train_file = path + "/user_itemset_training.csv"  # 여기 있는 건 전부 True
         valid_query_file = path + "/user_itemset_valid_query.csv"
         valid_answer_file = path + "/user_itemset_valid_answer.csv"
 
-        user_embedding_file = path + "/user_embedding_ngcf16_16_16_16.npy" # ngcf에서 만든거.. USER, ITEM에 대한 임베딩
+        user_embedding_file = path + "/user_embedding_ngcf16_16_16_16.npy"  # ngcf에서 만든거.. USER, ITEM에 대한 임베딩
         item_embedding_file = path + "/item_embedding_ngcf16_16_16_16.npy"
-        style_embedding_file = path + "/CASG_GNN_ITEM_OUT.npy" # CASG에서 만든 item에 대한 임베딩.
+        style_embedding_file = path + "CASG_GNN_ITEM_OUT_144_0.14373.npy" # "/CASG_GNN_ITEM_OUT.npy"  # CASG에서 만든 item에 대한 임베딩.
         itemset_item_file = path + "/itemset_item_training.csv"
+        itemset_item_file2 = path + "/itemset_item_valid_answer.csv"
+        itemset_item_file3 = path + "/itemset_item_valid_query.csv"
+        itemset_item_file4 = path + "/itemset_item_test_query.csv"
 
+        user_item_file = path + "/user_item.csv"
 
         self.max_user_id = 0
         self.max_itemset_id = 0
@@ -50,7 +55,7 @@ class Task1Dataset(Dataset):
         self.valid_labels = []
         self.valid = []
         with open(valid_query_file) as qf, open(valid_answer_file) as af:
-            for q_line , a_line in zip(qf, af):
+            for q_line, a_line in zip(qf, af):
                 user_id, itemset_id = list(map(int, q_line.strip().split(",")))
                 answer = int(a_line.strip())
                 self.valid.append([user_id, itemset_id, answer])
@@ -63,17 +68,30 @@ class Task1Dataset(Dataset):
         self.valid_labels = torch.tensor(self.valid_labels)
 
         # NGCF embedding
-        self.item_embedding = np.load(item_embedding_file) # (n_items, 64)
-        self.user_embedding = np.load(user_embedding_file) # (n_users, 64)
-        self.style_embedding = np.load(style_embedding_file) # (n_itemsets, 64)
+        self.item_embedding = np.load(item_embedding_file)  # (n_items, 64)
+        self.user_embedding = np.load(user_embedding_file)  # (n_users, 64)
+        self.style_embedding = np.load(style_embedding_file)  # (n_itemsets, 64)
 
         # itemset - item mapping file
         self.itemset_d = defaultdict(list)
-        with open(itemset_item_file) as f:
-            for line in f:
-                itemset_id, item_id = line.strip().split(",")
-                self.itemset_d[int(itemset_id)].append(int(item_id))
+        for path in [itemset_item_file, itemset_item_file2, itemset_item_file3, itemset_item_file4]:
+            with open(path) as f:
+                for line in f:
+                    itemset_id, item_id = line.strip().split(",")
+                    self.itemset_d[int(itemset_id)].append(int(item_id))
 
+        # pop feature
+        self.item_by_user_freq = defaultdict(int)
+        with open(user_item_file) as f:
+            for line in f:
+                user_id, item_id = line.strip().split(",")
+                self.item_by_user_freq[int(item_id)] += 1
+
+        self.itemset_by_user_freq = defaultdict(int)
+        with open(train_file) as f:
+            for line in f:
+                user_id, itemset_id = list(map(int, line.strip().split(",")))
+                self.itemset_by_user_freq[int(itemset_id)] += 1
 
     def regenerated_neg_sample(self):
         self.false_sample = []
@@ -88,7 +106,7 @@ class Task1Dataset(Dataset):
                 if len(neg_sample) == neg_size:
                     break
 
-                neg_id = np.random.randint(low=0, high=self.max_itemset_id+1, size=1)[0]
+                neg_id = np.random.randint(low=0, high=self.max_itemset_id + 1, size=1)[0]
                 if (neg_id not in true_items) and (neg_id not in neg_sample):
                     neg_sample.append(neg_id)
 
@@ -111,16 +129,20 @@ class Task1Dataset(Dataset):
             user_id, itemset_id, label = self.valid[sample_id]
 
         # itemset to item
-        item_list = np.array(self.itemset_d[itemset_id]) # (1,3,9,55)
+        item_list = np.array(self.itemset_d[itemset_id])  # (1,3,9,55)
         length = len(item_list)
         item_list = list(item_list[np.random.permutation(len(item_list))])
-        item_list += [0 for i in range(5 - len(item_list))] # max item = 5
+        item_list += [0 for i in range(5 - len(item_list))]  # max item = 5
 
         # torch.tensor(list(np.array(query_items)[np.random.permutation(len(query_items))]) + [0 for i in range(
         #     5 - len(query_items))]), len(query_items)
 
-        return user_id, itemset_id, torch.tensor([label], dtype=torch.float32), torch.tensor(item_list), length
+        # itemset_freq, item_max, item_min, item_mean
+        item_freq = [np.log(self.item_by_user_freq[item_id] + 1) for item_id in item_list]
+        itemset_freq = np.log(self.itemset_by_user_freq[itemset_id] + 1)
 
+        return user_id, itemset_id, torch.tensor([label], dtype=torch.float32), torch.tensor(
+            item_list), length, torch.tensor([itemset_freq, np.mean(item_freq), min(item_freq), max(item_freq)], dtype=torch.float32)
 
 
 class Task2Dataset(Dataset):
@@ -128,11 +150,11 @@ class Task2Dataset(Dataset):
         self.path = path
 
         # '/item_to_item_its_jac.csv' : 기본용
-        #'/item_by_item_its_jac_with_mst.csv' : mst 용
+        # '/item_by_item_its_jac_with_mst.csv' : mst 용
 
         # relation info
         train_file = path + '/itemset_item_training.csv'
-        item_to_item_file = path + '/item_by_item_its_jac_with_mst.csv' # 'item_by_item_its_jac_with_mst.csv' # '/item_to_item_its_jac.csv'
+        item_to_item_file = path + '/item_by_item_its_jac_with_mst.csv'  # 'item_by_item_its_jac_with_mst.csv' # '/item_to_item_its_jac.csv'
         valid_file = path + '/itemset_item_valid_query.csv'
         valid_answer_file = path + '/itemset_item_valid_answer.csv'
         mst_file = path + 'mst.csv'
@@ -156,11 +178,11 @@ class Task2Dataset(Dataset):
                 self.item_item_weights.append(float(score))
                 self.rel_cnt += 1
 
-        #read mst
+        # read mst
         self.mst_relation = set()
         with open(mst_file) as f:
             for line in f:
-                node_1, node_2 = line.strip().split(",") # str 타입
+                node_1, node_2 = line.strip().split(",")  # str 타입
                 self.mst_relation.add(node_1 + "\t" + node_2)
 
         # training dataset
@@ -242,7 +264,6 @@ class Task2Dataset(Dataset):
 
         self.g.ndata['feature'] = self.node_feature
 
-
     def __len__(self):
         # return len(self.train_itemset_items)
         return len(self.train)
@@ -251,14 +272,15 @@ class Task2Dataset(Dataset):
         # 전체 데이터에서 drop_rate 만큼을 train itemset으로 쓴다.
         # 그리고 나머지 item에 대하여만, train_g를 구성한다.
 
-        train_idx = set(np.random.choice(list(self.train_itemset_items.keys()), int(train_rate * len(self.train_itemset_items.keys())), replace=False))
+        train_idx = set(np.random.choice(list(self.train_itemset_items.keys()),
+                                         int(train_rate * len(self.train_itemset_items.keys())), replace=False))
 
         self.train = []
 
         new_item_itemset_d = defaultdict(set)
 
         for itemset_id, target_items in self.train_itemset_items.items():
-            
+
             # train set인 경우만 학습에 사용
             if itemset_id in train_idx:
                 pos = random.choice(target_items)
@@ -277,7 +299,7 @@ class Task2Dataset(Dataset):
                     neg_id = np.random.randint(low=0, high=self.n_items, size=1)[0]
                     if neg_id not in target_items and neg_id not in pos_candidate:
                         neg.append(neg_id)
-                
+
                 # self.train[itemset_id] = [pos, torch.tensor(neg), query, query_items]
                 self.train.append([pos, torch.tensor(neg), query, query_items])
             else:
@@ -292,14 +314,13 @@ class Task2Dataset(Dataset):
         new_weight = []
         for src, dst, weight in zip(self.item_item_src, self.item_item_dst, self.item_item_weights):
 
-            if src == dst: # self-loop
+            if src == dst:  # self-loop
                 new_src.append(src)
                 new_dst.append(dst)
                 new_weight.append(weight)
                 continue
 
-
-            src_itemset = new_item_itemset_d[src] # 여기에 있는 거면, train sample 노드 라는 것.
+            src_itemset = new_item_itemset_d[src]  # 여기에 있는 거면, train sample 노드 라는 것.
             dst_itemset = new_item_itemset_d[dst]
 
             # MST 노드인 경우, intersection이 0이여도 relation을 만들어야함.
@@ -309,7 +330,7 @@ class Task2Dataset(Dataset):
                 union = len(src_itemset.union(dst_itemset))
                 new_src.append(src)
                 new_dst.append(dst)
-                new_weight.append((intersection+1) / (union+1))
+                new_weight.append((intersection + 1) / (union + 1))
             else:
                 intersection = len(src_itemset.intersection(dst_itemset))
 
@@ -411,4 +432,7 @@ class Task2Dataset(Dataset):
 
         [pos, neg, query, query_items] = self.train[itemset_id]
 
-        return itemset_id, query, pos, neg, torch.tensor(list(np.array(query_items)[np.random.permutation(len(query_items))]) + [0 for i in range(5 - len(query_items))]), len(query_items)
+        return itemset_id, query, pos, neg, torch.tensor(
+            list(np.array(query_items)[np.random.permutation(len(query_items))]) + [0 for i in
+                                                                                    range(5 - len(query_items))]), len(
+            query_items)
