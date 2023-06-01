@@ -251,8 +251,9 @@ class Task2Dataset(Dataset):
                 item_id = int(tkns[0])
                 feature_ids = []
                 for f in tkns[1:]:
-                    feature_ids.append(int(f))
-                    self.max_feature_id = max(self.max_feature_id, int(f))
+                    if f != 'None':
+                        feature_ids.append(int(f))
+                        self.max_feature_id = max(self.max_feature_id, int(f))
 
                 buf[item_id] = feature_ids
 
@@ -268,7 +269,7 @@ class Task2Dataset(Dataset):
         # return len(self.train_itemset_items)
         return len(self.train)
 
-    def resample(self, train_rate=0.2):
+    def resample(self, train_rate=0.35):
         # 전체 데이터에서 drop_rate 만큼을 train itemset으로 쓴다.
         # 그리고 나머지 item에 대하여만, train_g를 구성한다.
 

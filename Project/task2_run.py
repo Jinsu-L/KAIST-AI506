@@ -15,14 +15,14 @@ else:
     device = 'cpu'
 
 ###########################################################
-batch_size = 1024
+batch_size = 65536
 lr = 1e-3
-epoch = 100
-scheduler_step = 200
-scheduler_decay = 0.75
+epoch = 3000
+scheduler_step = 300
+scheduler_decay = 0.9
 
-resample_rate = 0.2 # dataset에서 label로 쓰일 비율
-resample_epoch = 30
+resample_rate = 0.35 # dataset에서 label로 쓰일 비율
+resample_epoch = 10
 
 save_folder = "./GCN_3L_CASG"
 
