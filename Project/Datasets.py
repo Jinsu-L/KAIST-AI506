@@ -161,6 +161,8 @@ class Task2Dataset(Dataset):
         item_to_item_file = path + '/item_by_item_its_jac_with_mst.csv'  # 'item_by_item_its_jac_with_mst.csv' # '/item_to_item_its_jac.csv'
         valid_file = path + '/itemset_item_valid_query.csv'
         valid_answer_file = path + '/itemset_item_valid_answer.csv'
+
+        test_file = path + '/itemset_item_test_query.csv'
         mst_file = path + 'mst.csv'
         feature_file = path + 'louvain_community_feature.csv'
 
@@ -229,6 +231,13 @@ class Task2Dataset(Dataset):
             for line in f:
                 itemset_id, item_id = line.strip().split(",")
                 self.valid_itemset_label[int(itemset_id)] = int(item_id)
+
+        # test query
+        self.test_itemset_items = defaultdict(list)
+        with open(test_file) as f:
+            for line in f:
+                itemset_id, item_id = line.strip().split(",")
+                self.test_itemset_items[int(itemset_id)].append(int(item_id))
 
         # construct graph from the train data and add self-loops
         for i in range(self.max_item_id + 1):
