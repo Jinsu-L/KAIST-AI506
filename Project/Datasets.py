@@ -101,7 +101,7 @@ class Task1Dataset(Dataset):
 
         for user_id, true_items in self.true_user_itemset.items():
             neg_sample = []
-            neg_size = len(true_items)
+            neg_size = max(len(true_items), 20)
             while True:
                 if len(neg_sample) == neg_size:
                     break
@@ -131,7 +131,11 @@ class Task1Dataset(Dataset):
         # itemset to item
         item_list = np.array(self.itemset_d[itemset_id])  # (1,3,9,55)
         length = len(item_list)
-        item_list = list(item_list[np.random.permutation(len(item_list))])
+
+        if self.is_train:
+            item_list = list(item_list[np.random.permutation(len(item_list))])
+        else:
+            item_list = list(item_list)
         item_list += [0 for i in range(5 - len(item_list))]  # max item = 5
 
         # torch.tensor(list(np.array(query_items)[np.random.permutation(len(query_items))]) + [0 for i in range(
