@@ -12,9 +12,10 @@ from collections import defaultdict
 
 
 class Task1Dataset(Dataset):
-    def __init__(self, path, is_train=True):
+    def __init__(self, path, is_train=True, gen_test=False):
         self.path = path
         self.is_train = is_train
+        self.gen_test = gen_test
 
         train_file = path + "/user_itemset_training.csv"  # 여기 있는 건 전부 True
         valid_query_file = path + "/user_itemset_valid_query.csv"
@@ -22,13 +23,15 @@ class Task1Dataset(Dataset):
 
         user_embedding_file = path + "/user_embedding_ngcf16_16_16_16.npy"  # ngcf에서 만든거.. USER, ITEM에 대한 임베딩
         item_embedding_file = path + "/item_embedding_ngcf16_16_16_16.npy"
-        style_embedding_file = path + "CASG_GNN_ITEM_OUT_144_0.14373.npy" # "/CASG_GNN_ITEM_OUT.npy"  # CASG에서 만든 item에 대한 임베딩.
+        style_embedding_file = path + "CASG_GNN_ITEM_OUT_144_0.14373.npy"  # "/CASG_GNN_ITEM_OUT.npy"  # CASG에서 만든 item에 대한 임베딩.
         itemset_item_file = path + "/itemset_item_training.csv"
         itemset_item_file2 = path + "/itemset_item_valid_answer.csv"
         itemset_item_file3 = path + "/itemset_item_valid_query.csv"
         itemset_item_file4 = path + "/itemset_item_test_query.csv"
 
         user_item_file = path + "/user_item.csv"
+
+        test_query_file = path + "/user_itemset_test_query.csv"
 
         self.max_user_id = 0
         self.max_itemset_id = 0
@@ -93,6 +96,12 @@ class Task1Dataset(Dataset):
                 user_id, itemset_id = list(map(int, line.strip().split(",")))
                 self.itemset_by_user_freq[int(itemset_id)] += 1
 
+        self.test = []
+        with open(test_query_file) as f:
+            for line in f:
+                user_id, itemset_id = list(map(int, line.strip().split(",")))
+                self.test.append([user_id, itemset_id])
+
     def regenerated_neg_sample(self):
         self.false_sample = []
 
@@ -122,6 +131,21 @@ class Task1Dataset(Dataset):
             return len(self.valid)
 
     def __getitem__(self, sample_id):
+        if self.gen_test:
+            user_id, itemset_id = self.test[sample_id]
+            # itemset to item
+            item_list = np.array(self.itemset_d[itemset_id])  # (1,3,9,55)
+            length = len(item_list)
+            item_list = list(item_list)
+            item_list += [0 for i in range(5 - len(item_list))]  # max item = 5
+
+            item_freq = [np.log(self.item_by_user_freq[item_id] + 1) for item_id in item_list]
+            itemset_freq = np.log(self.itemset_by_user_freq[itemset_id] + 1)
+
+            return user_id, itemset_id, torch.tensor(item_list), length, torch.tensor(
+                [itemset_freq, np.mean(item_freq), min(item_freq), max(item_freq)],
+                dtype=torch.float32)
+
         if self.is_train:
             user_id, itemset_id, label = self.train[sample_id]
             # return user_id, itemset_id, torch.tensor([label], dtype=torch.float32)
@@ -146,7 +170,8 @@ class Task1Dataset(Dataset):
         itemset_freq = np.log(self.itemset_by_user_freq[itemset_id] + 1)
 
         return user_id, itemset_id, torch.tensor([label], dtype=torch.float32), torch.tensor(
-            item_list), length, torch.tensor([itemset_freq, np.mean(item_freq), min(item_freq), max(item_freq)], dtype=torch.float32)
+            item_list), length, torch.tensor([itemset_freq, np.mean(item_freq), min(item_freq), max(item_freq)],
+                                             dtype=torch.float32)
 
 
 class Task2Dataset(Dataset):
